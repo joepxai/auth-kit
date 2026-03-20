@@ -33,7 +33,6 @@
     .mode-btn:first-child { border-radius: 8px 0 0 8px; }
     .mode-btn:last-child { border-radius: 0 8px 8px 0; border-left: none; }
     .mode-btn.active { background: #111; color: #fff; border-color: #111; }
-    .hint { font-size: 12px; color: #aaa; text-align: center; }
   </style>
 </head>
 <body>
@@ -102,6 +101,7 @@ function switchMode(mode) {
   document.getElementById('login-password').style.display = mode === 'password' ? '' : 'none';
   const sec = document.getElementById('login-code-section');
   sec.style.display = mode === 'code' ? 'flex' : 'none';
+  if (mode === 'code') refreshCaptcha('login');
 }
 
 function refreshCaptcha(type) {

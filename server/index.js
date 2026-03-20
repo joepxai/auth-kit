@@ -3,14 +3,27 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
+const MySQLStore = require('express-mysql-session')(session);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// MySQL session 存储（重启服务不丢 session）
+const sessionStore = new MySQLStore({
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 3306,
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASS || '',
+  database: process.env.DB_NAME || 'auth_kit',
+  createDatabaseTable: true,
+});
+
 app.use(session({
   secret: process.env.JWT_SECRET || 'captcha-secret',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
+  store: sessionStore,
   cookie: { maxAge: 10 * 60 * 1000 }
 }));
 
