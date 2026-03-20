@@ -9,18 +9,27 @@ function randomCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-// 发送验证码
-router.post('/send-code', async (req, res) => {
+// 验证图形验证码中间件
+function checkCaptcha(req, res, next) {
+  const { captcha } = req.body;
+  if (!captcha) return res.json({ ok: false, msg: '请填写图形验证码' });
+  if (captcha.toLowerCase() !== (req.session.captcha || '')) {
+    return res.json({ ok: false, msg: '图形验证码错误' });
+  }
+  req.session.captcha = null;
+  next();
+}
+
+// 发送邮箱验证码（需先通过图形验证码）
+router.post('/send-code', checkCaptcha, async (req, res) => {
   const { email, type = 'register' } = req.body;
   if (!email) return res.json({ ok: false, msg: '请填写邮箱' });
 
-  // 注册时检查邮箱是否已存在
   if (type === 'register') {
     const [rows] = await db.query('SELECT id FROM users WHERE email=?', [email]);
     if (rows.length) return res.json({ ok: false, msg: '该邮箱已注册' });
   }
 
-  // 60秒内不重复发送
   const [recent] = await db.query(
     'SELECT id FROM verify_codes WHERE email=? AND type=? AND created_at > DATE_SUB(NOW(), INTERVAL 60 SECOND)',
     [email, type]
@@ -60,7 +69,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// 登录（密码）
+// 密码登录
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.json({ ok: false, msg: '参数不完整' });

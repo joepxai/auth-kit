@@ -9,27 +9,31 @@
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     .card { background: #fff; border-radius: 12px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
     h2 { font-size: 22px; margin-bottom: 24px; color: #111; }
-    .tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 1px solid #eee; }
+    .tabs { display: flex; margin-bottom: 24px; border-bottom: 1px solid #eee; }
     .tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; color: #999; font-size: 14px; border-bottom: 2px solid transparent; transition: all .2s; }
     .tab.active { color: #111; border-bottom-color: #111; font-weight: 600; }
-    .form { display: none; flex-direction: column; gap: 14px; }
+    .form { display: none; flex-direction: column; gap: 12px; }
     .form.active { display: flex; }
     input { width: 100%; padding: 11px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border .2s; }
     input:focus { border-color: #111; }
-    .row { display: flex; gap: 8px; }
+    .row { display: flex; gap: 8px; align-items: stretch; }
     .row input { flex: 1; }
     .btn-code { white-space: nowrap; padding: 11px 14px; background: #111; color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; transition: opacity .2s; }
     .btn-code:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-submit { width: 100%; padding: 12px; background: #111; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity .2s; }
+    .captcha-row { display: flex; gap: 8px; align-items: center; }
+    .captcha-row input { flex: 1; }
+    .captcha-img { height: 42px; border-radius: 8px; cursor: pointer; border: 1px solid #ddd; background: #f5f5f5; }
+    .btn-submit { width: 100%; padding: 12px; background: #111; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity .2s; margin-top: 4px; }
     .btn-submit:hover { opacity: 0.85; }
     .msg { font-size: 13px; text-align: center; min-height: 18px; }
     .msg.ok { color: #16a34a; }
     .msg.err { color: #dc2626; }
-    .login-mode { display: flex; gap: 0; margin-bottom: 4px; }
+    .login-mode { display: flex; margin-bottom: 2px; }
     .mode-btn { flex: 1; text-align: center; padding: 8px; font-size: 13px; cursor: pointer; color: #999; border: 1px solid #ddd; transition: all .2s; }
     .mode-btn:first-child { border-radius: 8px 0 0 8px; }
     .mode-btn:last-child { border-radius: 0 8px 8px 0; border-left: none; }
     .mode-btn.active { background: #111; color: #fff; border-color: #111; }
+    .hint { font-size: 12px; color: #aaa; text-align: center; }
   </style>
 </head>
 <body>
@@ -48,10 +52,19 @@
     </div>
     <input type="email" id="login-email" placeholder="邮箱" />
     <input type="password" id="login-password" placeholder="密码" />
-    <div class="row" id="login-code-row" style="display:none">
-      <input type="text" id="login-code" placeholder="验证码" maxlength="6" />
-      <button class="btn-code" id="btn-login-code" onclick="sendCode('login')">发送验证码</button>
+
+    <!-- 验证码登录专用 -->
+    <div id="login-code-section" style="display:none;flex-direction:column;gap:12px">
+      <div class="captcha-row">
+        <input type="text" id="login-captcha" placeholder="图形验证码" maxlength="4" />
+        <img class="captcha-img" id="login-captcha-img" src="/api/captcha" onclick="refreshCaptcha('login')" title="点击刷新" />
+      </div>
+      <div class="row">
+        <input type="text" id="login-code" placeholder="邮箱验证码" maxlength="6" />
+        <button class="btn-code" id="btn-login-code" onclick="sendCode('login')">发送验证码</button>
+      </div>
     </div>
+
     <button class="btn-submit" onclick="doLogin()">登录</button>
     <div class="msg" id="msg-login"></div>
   </div>
@@ -59,8 +72,12 @@
   <!-- 注册 -->
   <div class="form" id="form-register">
     <input type="email" id="reg-email" placeholder="邮箱" />
+    <div class="captcha-row">
+      <input type="text" id="reg-captcha" placeholder="图形验证码" maxlength="4" />
+      <img class="captcha-img" id="reg-captcha-img" src="/api/captcha" onclick="refreshCaptcha('register')" title="点击刷新" />
+    </div>
     <div class="row">
-      <input type="text" id="reg-code" placeholder="验证码" maxlength="6" />
+      <input type="text" id="reg-code" placeholder="邮箱验证码" maxlength="6" />
       <button class="btn-code" id="btn-reg-code" onclick="sendCode('register')">发送验证码</button>
     </div>
     <input type="password" id="reg-password" placeholder="密码（至少6位）" />
@@ -83,7 +100,13 @@ function switchMode(mode) {
   loginMode = mode;
   document.querySelectorAll('.mode-btn').forEach((b, i) => b.classList.toggle('active', (i === 0) === (mode === 'password')));
   document.getElementById('login-password').style.display = mode === 'password' ? '' : 'none';
-  document.getElementById('login-code-row').style.display = mode === 'code' ? '' : 'none';
+  const sec = document.getElementById('login-code-section');
+  sec.style.display = mode === 'code' ? 'flex' : 'none';
+}
+
+function refreshCaptcha(type) {
+  const img = document.getElementById(type === 'register' ? 'reg-captcha-img' : 'login-captcha-img');
+  img.src = '/api/captcha?' + Date.now();
 }
 
 function showMsg(id, msg, ok) {
@@ -104,24 +127,40 @@ function startCountdown(btnId) {
 
 async function sendCode(type) {
   const email = type === 'register' ? document.getElementById('reg-email').value : document.getElementById('login-email').value;
+  const captcha = type === 'register' ? document.getElementById('reg-captcha').value : document.getElementById('login-captcha').value;
   const msgId = type === 'register' ? 'msg-register' : 'msg-login';
   const btnId = type === 'register' ? 'btn-reg-code' : 'btn-login-code';
   if (!email) return showMsg(msgId, '请先填写邮箱', false);
-  const r = await fetch(`${API}/send-code`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, type }) }).then(r => r.json());
+  if (!captcha) return showMsg(msgId, '请填写图形验证码', false);
+  const r = await fetch(`${API}/send-code`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ email, type, captcha })
+  }).then(r => r.json());
   showMsg(msgId, r.msg, r.ok);
-  if (r.ok) startCountdown(btnId);
+  if (r.ok) {
+    startCountdown(btnId);
+  } else {
+    refreshCaptcha(type);
+  }
 }
 
 async function doLogin() {
   const email = document.getElementById('login-email').value;
   if (loginMode === 'password') {
     const password = document.getElementById('login-password').value;
-    const r = await fetch(`${API}/login`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) }).then(r => r.json());
+    const r = await fetch(`${API}/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password })
+    }).then(r => r.json());
     showMsg('msg-login', r.msg || (r.ok ? '登录成功' : '登录失败'), r.ok);
     if (r.ok) { localStorage.setItem('token', r.token); localStorage.setItem('email', r.email); }
   } else {
     const code = document.getElementById('login-code').value;
-    const r = await fetch(`${API}/login-code`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, code }) }).then(r => r.json());
+    const r = await fetch(`${API}/login-code`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, code })
+    }).then(r => r.json());
     showMsg('msg-login', r.msg || (r.ok ? '登录成功' : '登录失败'), r.ok);
     if (r.ok) { localStorage.setItem('token', r.token); localStorage.setItem('email', r.email); }
   }
@@ -132,7 +171,10 @@ async function doRegister() {
   const code = document.getElementById('reg-code').value;
   const password = document.getElementById('reg-password').value;
   if (password.length < 6) return showMsg('msg-register', '密码至少6位', false);
-  const r = await fetch(`${API}/register`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, code, password }) }).then(r => r.json());
+  const r = await fetch(`${API}/register`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ email, code, password })
+  }).then(r => r.json());
   showMsg('msg-register', r.msg, r.ok);
   if (r.ok) setTimeout(() => switchTab('login'), 1000);
 }
